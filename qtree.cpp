@@ -165,8 +165,28 @@ void QTree::Copy(const QTree& other) {
  * @param lr lower right point of current node's rectangle.
  */
 Node* QTree::BuildNode(const PNG& img, pair<unsigned int, unsigned int> ul, pair<unsigned int, unsigned int> lr) {
-	// Replace the line below with your implementation
-	return nullptr;
+	// just need average
+	RGBAPixel a(0, 0, 0);
+	// calculate total pixel count for averaging using height * width
+	// height = y_2 - y_1
+	// width = x_2 - x_1
+	unsigned int totalPx = (lr.second - ul.second)*(lr.first - ul.first); // sussy
+
+	for (unsigned int y = ul.second; y < lr.second; y++) {
+		for (unsigned int x = ul.first; x < lr.first; x++) {
+			RGBAPixel* px = img.getPixel(x, y);
+			a.r += px->r;
+			a.g += px->g;
+			a.b += px->b;
+		}
+	}
+
+	a.r = a.r/totalPx;
+	a.g = a.g/totalPx;
+	a.b = a.g/totalPx;
+
+	Node* nd = new Node(ul, lr, a);
+	return nd;
 }
 
 /*********************************************************/
