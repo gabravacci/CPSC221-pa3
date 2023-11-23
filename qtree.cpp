@@ -44,7 +44,11 @@
  */
 QTree::QTree(const PNG& imIn) {
 	// ADD YOUR IMPLEMENTATION BELOW
-	
+	this->height = imIn.height();
+	this->width = imIn.width();
+	pair<unsigned int, unsigned int> ul(0,0);
+	pair<unsigned int, unsigned int> lr(width - 1, height - 1);
+	this->root = BuildNode(imIn, ul, lr);
 }
 
 /**
@@ -74,7 +78,54 @@ QTree& QTree::operator=(const QTree& rhs) {
  */
 PNG QTree::Render(unsigned int scale) const {
 	// Replace the line below with your implementation
-	return PNG();
+	/**
+	 * @todo FIX SCALING FACTOR
+	*/
+	PNG img(width*scale, height*scale);
+	
+	vector<Node*> stack;
+	vector<Node*> leaves;
+	stack.push_back(root);
+	Node* nd;
+
+	while(!stack.empty()) {
+		nd = stack.back();
+		stack.pop_back();
+		if (!nd->NW) {
+			leaves.push_back(nd);
+		}
+		else {
+			stack.push_back(nd->NW);
+			if (nd->NE) stack.push_back(nd->NE);
+			if (nd->SW) stack.push_back(nd->SW);
+			if (nd->SE) stack.push_back(nd->SE);
+		}
+	}
+
+	
+	for (auto & it : leaves) {
+		// this seems hella slow, can improve?
+		if (scale > 1) {
+			unsigned int w = it->upLeft.first;
+			unsigned int h = it->upLeft.second;
+			if (h == 0) h = 1;
+			if (w == 0) w = 1;
+			for (unsigned int y = it->upLeft.second; y <= h*scale; y++) {
+				for (unsigned int x = it->upLeft.first; x <= w*scale; x++) {
+					RGBAPixel* px = img.getPixel(x, y);
+					px->r = it->avg.r;
+					px->g = it->avg.g;
+					px->b = it->avg.b;	
+				}
+			}
+		} else {
+			RGBAPixel* px = img.getPixel(it->upLeft.first, it->upLeft.second);
+			px->r = it->avg.r;
+			px->g = it->avg.g;
+			px->b = it->avg.b;
+		}
+	}
+	return img;
 }
 
 /**
@@ -165,31 +216,138 @@ void QTree::Copy(const QTree& other) {
  * @param lr lower right point of current node's rectangle.
  */
 Node* QTree::BuildNode(const PNG& img, pair<unsigned int, unsigned int> ul, pair<unsigned int, unsigned int> lr) {
-	// just need average
-	RGBAPixel a(0, 0, 0);
-	// calculate total pixel count for averaging using height * width
-	// height = y_2 - y_1
-	// width = x_2 - x_1
-	unsigned int totalPx = (lr.second - ul.second)*(lr.first - ul.first); // sussy
-
-	for (unsigned int y = ul.second; y < lr.second; y++) {
-		for (unsigned int x = ul.first; x < lr.first; x++) {
-			RGBAPixel* px = img.getPixel(x, y);
-			a.r += px->r;
-			a.g += px->g;
-			a.b += px->b;
-		}
+	// first of all: SORRY LMAO
+	unsigned int width = (lr.first - ul.first + 1);
+	unsigned int height = (lr.second - ul.second + 1);
+	unsigned int totalArea = height*width; // useful later
+	// default blank node so I don't have to reconstruct it everytime #memoryefficient #POGUS
+	RGBAPixel a;
+	Node* nd = new Node(ul, lr, a);
+	// base-case: single pixel (ul == lr) ==> height = width = 1
+	if (height == 1 && width == 1) {
+		nd->NE = nullptr;
+		nd->NW = nullptr;
+		nd->SE = nullptr;
+		nd->SW = nullptr;
+		// they're the same so doesn't matter LOLOLOLOL
+		RGBAPixel* px = img.getPixel(ul.first, lr.second);
+		// avg color of a pixel = pixel GOATED
+		a.r = px->r;
+		a.g = px->g;
+		a.b = px->b;
+		nd->avg = a;
+		return nd;
 	}
 
-	a.r = a.r/totalPx;
-	a.g = a.g/totalPx;
-	a.b = a.g/totalPx;
+	// subcase 1: unit width rectangle 
+	if (width == 1) {
+		unsigned int midY = (ul.second + lr.second)/2;
 
-	Node* nd = new Node(ul, lr, a);
+		// NW COORDINATES AND AREA ****************************************************
+		pair<unsigned int, unsigned int> ulNW(ul.first, ul.second);
+		pair<unsigned int, unsigned int> lrNW(ul.first, midY);
+		unsigned int weightNW = (midY - ul.second + 1); // area of rectangle, basically
+		// SW COORDINATES AND ARE *****************************************************
+		pair<unsigned int, unsigned int> ulSW(ul.first, midY+1);
+		pair<unsigned int, unsigned int> lrSW(ul.first, lr.second);
+		unsigned int weightSW = (lr.second - midY);
+
+		if ((weightNW + weightSW) != totalArea) {
+			std::cout << "SKILL ISSUE" << std::endl;
+			return nullptr;
+		}
+
+		// recursion OMEGALOL
+		nd->NW = BuildNode(img, ulNW, lrNW);
+		nd->NE = nullptr;
+		nd->SW = BuildNode(img, ulSW, lrSW);
+		nd->SE = nullptr;
+
+		// time to calculate the average in O(1) POGUS
+		a.r = (nd->NW->avg.r)*weightNW + (nd->SW->avg.r)*weightSW;
+		a.r = a.r/(weightNW + weightSW);
+		a.g = (nd->NW->avg.g)*weightNW + (nd->SW->avg.g)*weightSW;
+		a.g = a.g/(weightNW + weightSW);
+		a.b = (nd->NW->avg.b)*weightNW + (nd->SW->avg.b)*weightSW;
+		a.b = a.b/(weightNW + weightSW);
+	}
+	// subcase 2: unit height rectangle
+	else if (height == 1) {
+		unsigned int midX = (ul.first + lr.first)/2;
+
+		// NW COORDINATES AND AREA ****************************************************
+		pair<unsigned int, unsigned int> ulNW(ul.first, ul.second);
+		pair<unsigned int, unsigned int> lrNW(midX, ul.second);
+		unsigned int weightNW = (midX - ul.first + 1); // area of rectangle, basically
+		// NE COORDINATES AND AREA ****************************************************
+		pair<unsigned int, unsigned int> ulNE(midX+1, ul.second);
+		pair<unsigned int, unsigned int> lrNE(lr.first, ul.second);
+		unsigned int weightNE = (lr.first - midX);
+
+		if ((weightNW + weightNE) != totalArea) {
+			std::cout << "SKILL ISSUE" << std::endl;
+			return nullptr;
+		}
+
+		// recursion OMEGALOL
+		nd->NW = BuildNode(img, ulNW, lrNW);
+		nd->NE = BuildNode(img, ulNE, lrNE);
+		nd->SW = nullptr;
+		nd->SE = nullptr;
+
+		// time to calculate the average in O(1) POGUS
+		a.r = (nd->NW->avg.r)*weightNW + (nd->NE->avg.r)*weightNE;
+		a.r = a.r/(weightNW + weightNE);
+		a.g = (nd->NW->avg.g)*weightNW + (nd->NE->avg.g)*weightNE;
+		a.g = a.g/(weightNW + weightNE);
+		a.b = (nd->NW->avg.b)*weightNW + (nd->NE->avg.b)*weightNE;
+		a.b = a.b/(weightNW + weightNE);
+	}
+	else {
+		// find midpoint in X
+		unsigned int midX = (ul.first + lr.first)/2;
+		unsigned int midY = (ul.second + lr.second)/2;
+
+		// start making BABIES
+		// NW COORDINATES AND AREA ****************************************************
+		pair<unsigned int, unsigned int> ulNW(ul.first, ul.second);
+		pair<unsigned int, unsigned int> lrNW(midX, midY);
+		unsigned int weightNW = (midX - ul.first + 1)*(midY - ul.second + 1); // area of rectangle, basically
+		// NE COORDINATES AND AREA ****************************************************
+		pair<unsigned int, unsigned int> ulNE(midX+1, ul.second);
+		pair<unsigned int, unsigned int> lrNE(lr.first, midY);
+		unsigned int weightNE = (lr.first - midX)*(midY - ul.second + 1);
+		// SW COORDINATES AND ARE *****************************************************
+		pair<unsigned int, unsigned int> ulSW(ul.first, midY+1);
+		pair<unsigned int, unsigned int> lrSW(midX, lr.second);
+		unsigned int weightSW = (midX - ul.first + 1)*(lr.second - midY);
+		// SE COORDINATES AND AREA ****************************************************
+		pair<unsigned int, unsigned int> ulSE(midX+1, midY+1);
+		pair<unsigned int, unsigned int> lrSE(lr.first, lr.second);
+		unsigned int weightSE = (lr.first - midX)*(lr.second - midY);
+
+		if ((weightNW + weightNE + weightSW + weightSE) != totalArea) {
+			std::cout << "SKILL ISSUE" << std::endl;
+			return nullptr;
+		}
+
+		// recursion OMEGALOL
+		nd->NW = BuildNode(img, ulNW, lrNW);
+		nd->NE = BuildNode(img, ulNE, lrNE);
+		nd->SW = BuildNode(img, ulSW, lrSW);
+		nd->SE = BuildNode(img, ulSE, lrSE);
+
+		// time to calculate the average in O(1) POGUS
+		a.r = (nd->NW->avg.r)*weightNW + (nd->NE->avg.r)*weightNE + (nd->SW->avg.r)*weightSW + (nd->SE->avg.r)*weightSE;
+		// a.r = a.r/(weightNW + weightNE + weightSW + weightSE);
+		a.g = (nd->NW->avg.g)*weightNW + (nd->NE->avg.g)*weightNE + (nd->SW->avg.g)*weightSW + (nd->SE->avg.g)*weightSE;
+		// a.g = a.g/(weightNW + weightNE + weightSW + weightSE);
+		a.b = (nd->NW->avg.b)*weightNW + (nd->NE->avg.b)*weightNE + (nd->SW->avg.b)*weightSW + (nd->SE->avg.b)*weightSE;
+		// a.b = a.b/(weightNW + weightNE + weightSW + weightSE);
+	}
 	return nd;
 }
 
 /*********************************************************/
 /*** IMPLEMENT YOUR OWN PRIVATE MEMBER FUNCTIONS BELOW ***/
 /*********************************************************/
-

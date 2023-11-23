@@ -20,7 +20,7 @@ Node::Node(pair<unsigned int, unsigned int> ul, pair<unsigned int, unsigned int>
 	NW = nullptr;
 	NE = nullptr;
 	SW = nullptr;
-	SE = nullptr;
+	SE = nullptr; 
 }
 
 /**
