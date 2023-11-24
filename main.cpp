@@ -18,10 +18,13 @@ using namespace std;
 /**********************************/
 /*** TEST FUNCTION DECLARATIONS ***/
 /**********************************/
+void ColorTest(int scale);
 void TestBuildRender(unsigned int scale);
 void TestFlipHorizontal();
+void TestRGBFlip(string file);
 void TestRotateCCW();
 void TestPrune(double tol);
+void CopyTest();
 
 /***********************************/
 /*** MAIN FUNCTION PROGRAM ENTRY ***/
@@ -29,12 +32,21 @@ void TestPrune(double tol);
 
 int main(int argc, char* argv[]) {
 
-	TestBuildRender(1);
-	TestBuildRender(6);
+	// TestBuildRender(1);
+	// TestBuildRender(6);
+	
 	TestFlipHorizontal();
-	TestRotateCCW();
-	TestPrune(0.01);
-	TestPrune(0.05);
+	
+	// TestRotateCCW();
+	// CopyTest();
+
+	TestRGBFlip("t1");
+	TestRGBFlip("r2");
+	TestRGBFlip("t2");
+	TestRGBFlip("t3");
+
+	// TestPrune(0.01);
+	// TestPrune(0.05);
 
 	return 0;
 }
@@ -42,6 +54,26 @@ int main(int argc, char* argv[]) {
 /*************************************/
 /*** TEST FUNCTION IMPLEMENTATIONS ***/
 /*************************************/
+
+void ColorTest(int scale) {
+	PNG input;
+	input.readFromFile("images-original/frame.png");
+
+	QTree t(input);
+	PNG output = t.Render(scale);
+	string outfilename = "images-output/frame-png_x" + to_string(scale) + ".png";
+	output.writeToFile(outfilename);
+}
+
+void CopyTest() {
+	PNG input;
+	input.readFromFile("images-original/malachi-60x87.png");
+	QTree t1(input);
+
+	QTree t2(t1);
+	PNG output = t2.Render(1);
+	output.writeToFile("images-output/out-copy.png");
+}
 
 void TestBuildRender(unsigned int scale) {
 	cout << "Entered TestBuildRender, scale: " << scale << endl;
@@ -64,7 +96,32 @@ void TestBuildRender(unsigned int scale) {
 	output.writeToFile(outfilename);
 	cout << "done." << endl;
 
+	PNG soln;
+	string solnname = "images-soln/soln-malachi-render_x" + to_string(scale) + ".png";
+    soln.readFromFile(solnname);
+    cout << "RESULT: " << (output == soln) << endl;
+
 	cout << "Exiting TestBuildRender.\n" << endl;
+}
+
+
+void TestRGBFlip(string file) {
+	cout << "flipping " << file << endl;
+
+	// read input PNG
+	PNG input;
+	input.readFromFile("test/"+file+".png");
+
+	QTree t(input);
+
+
+	t.FlipHorizontal();
+
+	PNG output = t.Render(1);
+
+	// write output PNG
+	string outfilename = "test/"+file+"-flip.png";
+	output.writeToFile(outfilename);
 }
 
 void TestFlipHorizontal() {
@@ -92,6 +149,11 @@ void TestFlipHorizontal() {
 	output.writeToFile(outfilename);
 	cout << "done." << endl;
 
+	PNG soln;
+	string solnname = "images-soln/soln-malachi-fliphorizontal_x1-render_x1.png";
+    soln.readFromFile(solnname);
+    cout << "RESULT: " << (output == soln) << endl;
+
 	cout << "Calling FlipHorizontal a second time... ";
 	t.FlipHorizontal();
 	cout << "done." << endl;
@@ -105,6 +167,10 @@ void TestFlipHorizontal() {
 	cout << "Writing rendered PNG to file... ";
 	output.writeToFile(outfilename);
 	cout << "done." << endl;
+
+	solnname = "images-soln/soln-malachi-fliphorizontal_x2-render_x1.png";
+    soln.readFromFile(solnname);
+    cout << "RESULT: " << (output == soln) << endl;
 
 	cout << "Exiting TestFlipHorizontal.\n" << endl;
 }
